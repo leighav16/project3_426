@@ -3,31 +3,14 @@ USE ieee.std_logic_1164.all;
 USE ieee.std_logic_arith.all;
 
 entity cpu is
-PORT(clk, CLK_in : in STD_LOGIC;
+PORT(clk: in STD_LOGIC;
 	 reset : in STD_LOGIC;
 	 Inport0, Inport1 : in STD_LOGIC_VECTOR(7 downto 0);
 	 Outport0, Outport1	: out STD_LOGIC_VECTOR(7 downto 0);
-	 --SEG7out_R, SEG7out_L	: out STD_LOGIC_VECTOR(6 downto 0)
-	 ANODE : out STD_LOGIC_VECTOR(3 downto 0);
-	 SEG_OUT : out STD_LOGIC_VECTOR (6 downto 0));
+	 SEG7out_R, SEG7out_L	: out STD_LOGIC_VECTOR(6 downto 0));
 end cpu;
 
 architecture a of cpu is
-
-component Multiplexer is
-    Port ( count : in STD_LOGIC;
-           SEG_1 : in STD_LOGIC_VECTOR (6 downto 0);
-           SEG_2 : in STD_LOGIC_VECTOR (6 downto 0);
-           AN : out STD_LOGIC_VECTOR (3 downto 0);
-           SEG_out : out STD_LOGIC_VECTOR (6 downto 0));
-end component;
-
-component clk_div_1kHz is
-    Port ( clkin : in STD_LOGIC;
-           reset : in STD_LOGIC;
---           clkout : out STD_LOGIC;
-           R_or_L : out STD_LOGIC);         -- determine if the output will be on the right or left 7 seg
-end component;
 
 -- ----------- Declare the ALU component ----------
 component alu is
@@ -43,16 +26,7 @@ signal ALU_OUT : SIGNED(7 downto 0);
 signal ALU_N, ALU_V, ALU_Z : STD_LOGIC;
 
 -- ------------ Declare the 512x8 RAM component --------------
-component microram is
-port (  CLOCK   : in STD_LOGIC ;
-		ADDRESS	: in STD_LOGIC_VECTOR (8 downto 0);
-		DATAOUT : out STD_LOGIC_VECTOR (7 downto 0);
-		DATAIN  : in STD_LOGIC_VECTOR (7 downto 0);
-		WE	: in STD_LOGIC 
-	 );
-end component;
-
---component microram_sim is
+--component microram is
 --port (  CLOCK   : in STD_LOGIC ;
 --		ADDRESS	: in STD_LOGIC_VECTOR (8 downto 0);
 --		DATAOUT : out STD_LOGIC_VECTOR (7 downto 0);
@@ -60,6 +34,15 @@ end component;
 --		WE	: in STD_LOGIC 
 --	 );
 --end component;
+
+component microram_sim is
+port (  CLOCK   : in STD_LOGIC ;
+		ADDRESS	: in STD_LOGIC_VECTOR (8 downto 0);
+		DATAOUT : out STD_LOGIC_VECTOR (7 downto 0);
+		DATAIN  : in STD_LOGIC_VECTOR (7 downto 0);
+		WE	: in STD_LOGIC 
+	 );
+end component;
 -- ---------- Declare signals interfacing to RAM ---------------
 signal RAM_DATA_OUT : STD_LOGIC_VECTOR(7 downto 0);  -- DATAOUT output of RAM
 signal ADDR : STD_LOGIC_VECTOR(8 downto 0);	         -- ADDRESS input of RAM
@@ -138,14 +121,8 @@ signal Exc_CCWrite : STD_LOGIC;         -- Latch ALU status bits in CCR
 signal Exc_IOWrite_LED : STD_LOGIC;     -- Latch data bus in I/O to the LEDs
 signal Exc_IOWrite_7seg : STD_LOGIC;    -- Latch data bus in I/O to the 7 segment display
 
-signal R_or_L : STD_LOGIC;
-signal SEG7out_R, SEG7out_L	: STD_LOGIC_VECTOR(6 downto 0);
-	
 begin
 
-M1 : Multiplexer PORT MAP (count => R_or_L, SEG_1 => SEG7out_R, SEG_2 => SEG7out_L, AN => ANODE, SEG_OUT => SEG_OUT);
-
-C1 : clk_div_1khz PORT MAP (clkin => CLK_in, reset => reset, R_or_L => R_or_L);
 
 -- ------------ Instantiate the ALU component ---------------
 U1 : alu PORT MAP (ALU_A, ALU_B, ALU_FUNC, ALU_OUT, ALU_N, ALU_V, ALU_Z);
@@ -154,9 +131,9 @@ U1 : alu PORT MAP (ALU_A, ALU_B, ALU_FUNC, ALU_OUT, ALU_N, ALU_V, ALU_Z);
 ALU_FUNC <= IR(6 downto 4);
 	
 -- ------------ Instantiate the RAM component -------------
-U2 : microram PORT MAP (CLOCK => clk, ADDRESS => ADDR, DATAOUT => RAM_DATA_OUT, DATAIN => DATA, WE => RAM_WE);
+--U2 : microram PORT MAP (CLOCK => clk, ADDRESS => ADDR, DATAOUT => RAM_DATA_OUT, DATAIN => DATA, WE => RAM_WE);
 
---U2 : microram_sim PORT MAP (CLOCK => clk, ADDRESS => ADDR, DATAOUT => RAM_DATA_OUT, DATAIN => DATA, WE => RAM_WE);
+U2 : microram_sim PORT MAP (CLOCK => clk, ADDRESS => ADDR, DATAOUT => RAM_DATA_OUT, DATAIN => DATA, WE => RAM_WE);
 
 -- ---------------- Generate RAM write enable ---------------------
 -- The address and data are presented to the RAM during the Memory phase, 
@@ -315,11 +292,13 @@ case CurrState is
 						        
                           when "0001000"|"0001001" =>          -- BCDO R,P
 						        if(IR(0) = '0') then
-							       SEG_R <= Decode(STD_LOGIC_VECTOR(A(3 downto 0)));
-							       SEG_L <= Decode(STD_LOGIC_VECTOR(A(7 downto 4)));
+						           DATA <= STD_LOGIC_VECTOR(A);
+							       SEG_R <= Decode(STD_LOGIC_VECTOR(DATA(3 downto 0)));
+							       SEG_L <= Decode(STD_LOGIC_VECTOR(DATA(7 downto 4)));
 						        else
-							       SEG_R <= Decode(STD_LOGIC_VECTOR(B(3 downto 0)));
-							       SEG_L <= Decode(STD_LOGIC_VECTOR(B(7 downto 4)));
+						           DATA <= STD_LOGIC_VECTOR(B);
+							       SEG_R <= Decode(STD_LOGIC_VECTOR(DATA(3 downto 0)));
+							       SEG_L <= Decode(STD_LOGIC_VECTOR(DATA(7 downto 4)));
 						        end if;
 						        Exc_IOWrite_7seg <= '1';
 						
